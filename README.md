@@ -7,4 +7,4 @@ text/html
 tcp-based
 OPTIONS, GET (w/ Query String), HEAD, POST, PUT, DELETE, TRACE,
 
-refernce for implementation: RFC2616
+reference for implementation: RFC2616
