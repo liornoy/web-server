@@ -1,3 +1,0 @@
-﻿  WebServer.cpp
-C:\Users\nemon\source\web-server\web-server\WebServer.cpp(4,1): warning C4326: return type of 'main' should be 'int' instead of 'void'
-  web-server.vcxproj -> C:\Users\nemon\source\web-server\Debug\web-server.exe
