@@ -24,13 +24,12 @@ namespace web_server {
 		SOCKET id;
 		SocketState socketState;
 		char buffer[128];
+
 	public:
-		Socket(SOCKET id, int recvStatus) { this->id = id; socketState.send = IDLE; socketState.recv = recvStatus; }
-		bool operator==(const Socket& other) const;
-		const SOCKET getSocketID()const { return id; }
+		Socket(SOCKET id, int recvStatus); 
+		const SOCKET GetSocketID()const { return id; }
 		const SocketState getSocketState()const { return socketState; }
 		void setSocketSendState(int newState){ socketState.send = newState; }
-
-		char* getBuffer() { return buffer; }
+		bool operator==(const Socket& other) const;
 	};
 }
