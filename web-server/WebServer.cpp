@@ -6,19 +6,17 @@ void main()
 	server.Run();
 }
 void WebServer::Run(){
-
 	// Init Server's Listen Socket
 	initListenSocket();
 	
+	fd_set waitRecv, waitSend;
+	list<SocketState>::iterator it;
+	int numOfFD;
+
 	while (true)
 	{
-		fd_set waitRecv;
 		FD_ZERO(&waitRecv);
-
-		fd_set waitSend;
 		FD_ZERO(&waitSend);
-
-		std::list<SocketState>::iterator it;
 
 		for (it = sockets.begin(); it != sockets.end(); ++it) {
 			if (((*it).recv == LISTEN) || ((*it).recv == RECEIVE))
@@ -27,20 +25,19 @@ void WebServer::Run(){
 				FD_SET((*it).id, &waitSend);
 		}
 
-		int nfd;
-		nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
+		numOfFD = select(0, &waitRecv, &waitSend, NULL, NULL);
 
-		if (nfd == SOCKET_ERROR)
+		if (SOCKET_ERROR == numOfFD)
 		{
 			cerr << "Server: Error at select(): " << WSAGetLastError() << endl;
 			WSACleanup();
 			return;
 		}
 
-		for (it = sockets.begin(); it != sockets.end() && nfd > 0; ++it) {
+		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
 			if (FD_ISSET((*it).id, &waitRecv))
 			{
-				nfd--;
+				numOfFD--;
 				switch ((*it).recv)
 				{
 				case LISTEN:
@@ -55,11 +52,9 @@ void WebServer::Run(){
 					break;
 				}
 			}
-		}
-		for (it = sockets.begin(); it != sockets.end() && nfd > 0; ++it) {
 			if (FD_ISSET((*it).id, &waitSend))
 			{
-				nfd--;
+				numOfFD--;
 				sendMessage(&(*it));
 			}
 		}
@@ -144,7 +139,6 @@ bool WebServer::addSocket(SOCKET id, int what)
 	}
 	return (false);
 }
-
 
 void WebServer::acceptConnection(SOCKET id)
 {
