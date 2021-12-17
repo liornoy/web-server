@@ -10,9 +10,6 @@ void WebServer::Run(){
 	// Init Server's Listen Socket
 	initListenSocket();
 	
-
-
-
 	while (true)
 	{
 		fd_set waitRecv;
@@ -35,7 +32,7 @@ void WebServer::Run(){
 
 		if (nfd == SOCKET_ERROR)
 		{
-			cout << "Server: Error at select(): " << WSAGetLastError() << endl;
+			cerr << "Server: Error at select(): " << WSAGetLastError() << endl;
 			WSACleanup();
 			return;
 		}
@@ -82,7 +79,7 @@ void WebServer::initListenSocket() {
 
 	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
-		cout << "Server: Error at WSAStartup()\n";
+		cerr << "Server: Error at WSAStartup()\n";
 		return;
 	}
 
@@ -90,7 +87,7 @@ void WebServer::initListenSocket() {
 
 	if (INVALID_SOCKET == listenSocket)
 	{
-		cout << "Server: Error at socket(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at socket(): " << WSAGetLastError() << endl;
 		WSACleanup();
 		return;
 	}
@@ -103,7 +100,7 @@ void WebServer::initListenSocket() {
 
 	if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
 	{
-		cout << "Server: Error at bind(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at bind(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return;
@@ -111,7 +108,7 @@ void WebServer::initListenSocket() {
 
 	if (SOCKET_ERROR == listen(listenSocket, 5))
 	{
-		cout << "Server: Error at listen(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at listen(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return;
@@ -121,6 +118,17 @@ void WebServer::initListenSocket() {
 
 	addSocket(listenSocket, LISTEN);
 }
+
+void WebServer::printDisconnectSocket(SOCKET* socket) {
+	struct sockaddr_in name;
+	int nameLen = sizeof(name);
+
+	if (getpeername(*socket,(struct sockaddr*) & name, &nameLen) == SOCKET_ERROR) {
+		cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
+	}
+	cout << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected." << endl;
+}
+
 bool WebServer::addSocket(SOCKET id, int what)
 {
 	if (sockets.size() < MAX_SOCKETS) {
@@ -146,7 +154,7 @@ void WebServer::acceptConnection(SOCKET id)
 	SOCKET msgSocket = accept(id, (struct sockaddr*)&from, &fromLen);
 	if (INVALID_SOCKET == msgSocket)
 	{
-		cout << "Server: Error at accept(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at accept(): " << WSAGetLastError() << endl;
 		return;
 	}
 	cout << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
@@ -157,7 +165,7 @@ void WebServer::acceptConnection(SOCKET id)
 	unsigned long flag = 1;
 	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
 	{
-		cout << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
 	}
 
 	if (addSocket(msgSocket, RECEIVE) == false)
@@ -177,14 +185,15 @@ bool WebServer::receiveMessage(SocketState* socket)
 
 	if (SOCKET_ERROR == bytesRecv)
 	{
-		cout << "Server: Error at recv(): " << WSAGetLastError() << endl;
-
+		cerr << "Server: Error at recv(): " << WSAGetLastError() << endl;
+		printDisconnectSocket(&msgSocket);
 		closesocket(msgSocket);
 		return false;
 	}
 
 	if (bytesRecv == 0)
 	{
+		printDisconnectSocket(&msgSocket);
 		closesocket(msgSocket);
 		return false;
 	}
@@ -220,7 +229,7 @@ void WebServer::sendMessage(SocketState* socket_ptr)
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
 	{
-		cout << "Server: Error at send(): " << WSAGetLastError() << endl;
+		cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
 		return;
 	}
 
