@@ -2,236 +2,240 @@
 
 void main()
 {
-	WebServer server;
+	web_server::WebServer server;
 	server.Run();
 }
-void WebServer::Run(){
-	// Init Server's Listen Socket
-	initListenSocket();
-	
-	fd_set waitRecv, waitSend;
-	list<SocketState>::iterator it;
-	int numOfFD;
 
-	while (true)
-	{
-		FD_ZERO(&waitRecv);
-		FD_ZERO(&waitSend);
+namespace web_server {
+
+	int WebServer::selectSockets(fd_set* waitRecv, fd_set* waitSend) {
+
+		FD_ZERO(waitRecv);
+		FD_ZERO(waitSend);
+
+		list<Socket>::iterator it;
 
 		for (it = sockets.begin(); it != sockets.end(); ++it) {
-			if (((*it).recv == LISTEN) || ((*it).recv == RECEIVE))
-				FD_SET((*it).id, &waitRecv);
-			if ((*it).send == SEND_RESPONSE)
-				FD_SET((*it).id, &waitSend);
+			SocketState currSocketState = (*it).getSocketState();
+			if (currSocketState.recv == LISTEN || currSocketState.recv == RECEIVE)
+				FD_SET((*it).getSocketID(), waitRecv);
+			if (currSocketState.send == SEND_RESPONSE)
+				FD_SET((*it).getSocketID(), waitSend);
 		}
+		return select(0, waitRecv, waitSend, NULL, NULL);
+	}
 
-		numOfFD = select(0, &waitRecv, &waitSend, NULL, NULL);
-
-		if (SOCKET_ERROR == numOfFD)
-		{
-			cerr << "Server: Error at select(): " << WSAGetLastError() << endl;
-			WSACleanup();
-			return;
-		}
-
+	void WebServer::handleWaitRecv(int& numOfFD, fd_set* waitRecv) {
+		list<Socket>::iterator it;
 		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).id, &waitRecv))
+			if (FD_ISSET((*it).getSocketID(), waitRecv))
 			{
 				numOfFD--;
-				switch ((*it).recv)
+				switch ((*it).getSocketState().recv)
 				{
 				case LISTEN:
-					acceptConnection((*it).id);
+					acceptConnection(&(*it));
 					break;
 
 				case RECEIVE:
-					if (!receiveMessage(&(*it))) {
+					// false if connection needs to shut down
+					if (false == receiveMessage(&(*it))) {
 						it = sockets.erase(it);
 						--it;
 					}
 					break;
 				}
 			}
-			if (FD_ISSET((*it).id, &waitSend))
+		}
+	}
+	void WebServer::handleWaitSend(int& numOfFD, fd_set* waitSend) {
+		list<Socket>::iterator it;
+		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
+			if (FD_ISSET((*it).getSocketID(), waitSend))
 			{
 				numOfFD--;
 				sendMessage(&(*it));
 			}
 		}
 	}
+	void WebServer::Run() {
+		// Init Server's Listen Socket
+		SOCKET listenSocketId = initListenSocket();
 
-	closeServer();
-}
+		if (listenSocketId == NULL) {
+			return;
+		}
 
-void WebServer::closeServer() {
-	cout << "Server: Server Shutting Down.\n";
-	closesocket(listenSocket);
-	WSACleanup();
-}
+		fd_set waitRecv, waitSend;
+		int numOfFD;
 
-void WebServer::initListenSocket() {
-	WSAData wsaData;
-
-	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
-	{
-		cerr << "Server: Error at WSAStartup()\n";
-		return;
-	}
-
-	listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-	if (INVALID_SOCKET == listenSocket)
-	{
-		cerr << "Server: Error at socket(): " << WSAGetLastError() << endl;
-		WSACleanup();
-		return;
-	}
-
-	sockaddr_in serverService;
-
-	serverService.sin_addr.s_addr = INADDR_ANY;
-	serverService.sin_family = AF_INET;
-	serverService.sin_port = htons(SERVER_PORT);
-
-	if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
-	{
-		cerr << "Server: Error at bind(): " << WSAGetLastError() << endl;
-		closesocket(listenSocket);
-		WSACleanup();
-		return;
-	}
-
-	if (SOCKET_ERROR == listen(listenSocket, 5))
-	{
-		cerr << "Server: Error at listen(): " << WSAGetLastError() << endl;
-		closesocket(listenSocket);
-		WSACleanup();
-		return;
-	}
-
-	cout << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << SERVER_PORT << endl;
-
-	addSocket(listenSocket, LISTEN);
-}
-
-void WebServer::printDisconnectSocket(SOCKET* socket) {
-	struct sockaddr_in name;
-	int nameLen = sizeof(name);
-
-	if (getpeername(*socket,(struct sockaddr*) & name, &nameLen) == SOCKET_ERROR) {
-		cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
-	}
-	cout << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected." << endl;
-}
-
-bool WebServer::addSocket(SOCKET id, int what)
-{
-	if (sockets.size() < MAX_SOCKETS) {
-		SocketState socket;
-
-		socket.id = id;
-		socket.recv = what;
-		socket.send = IDLE;
-		socket.len = 0;
-
-		sockets.push_back(socket);
-		return (true);
-	}
-	return (false);
-}
-
-void WebServer::acceptConnection(SOCKET id)
-{
-	struct sockaddr_in from;
-	int fromLen = sizeof(from);
-
-	SOCKET msgSocket = accept(id, (struct sockaddr*)&from, &fromLen);
-	if (INVALID_SOCKET == msgSocket)
-	{
-		cerr << "Server: Error at accept(): " << WSAGetLastError() << endl;
-		return;
-	}
-	cout << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
-
-	//
-	// Set the socket to be in non-blocking mode.
-	//
-	unsigned long flag = 1;
-	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
-	{
-		cerr << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
-	}
-
-	if (addSocket(msgSocket, RECEIVE) == false)
-	{
-		cout << "\t\tToo many connections, dropped!\n";
-		closesocket(id);
-	}
-	return;
-}
-
-bool WebServer::receiveMessage(SocketState* socket)
-{
-	SOCKET msgSocket = (*socket).id;
-
-	int len = (*socket).len;
-	int bytesRecv = recv(msgSocket,&(*socket).buffer[len], sizeof((*socket).buffer) - len, 0);
-
-	if (SOCKET_ERROR == bytesRecv)
-	{
-		cerr << "Server: Error at recv(): " << WSAGetLastError() << endl;
-		printDisconnectSocket(&msgSocket);
-		closesocket(msgSocket);
-		return false;
-	}
-
-	if (bytesRecv == 0)
-	{
-		printDisconnectSocket(&msgSocket);
-		closesocket(msgSocket);
-		return false;
-	}
-
-	else
-	{
-		(*socket).buffer[len + bytesRecv] = '\0'; //add the null-terminating to make it a string
-		cout << "Server: Recieved: " << bytesRecv << " bytes of \"" << &(*socket).buffer[len] << "\" message.\n";
-
-		(*socket).len += bytesRecv;
-
-		if ((*socket).len > 0)
+		while (true)
 		{
-			(*socket).send = HANDLE_REQ;
+			numOfFD = selectSockets(&waitRecv, &waitSend);
+
+			if (SOCKET_ERROR == numOfFD) {
+				cerr << "Server: Error at select(): " << WSAGetLastError() << endl;
+				WSACleanup();
+				return;
+			}
+			handleWaitRecv(numOfFD, &waitRecv);
+			handleWaitSend(numOfFD, &waitSend);
+			}
+		
+
+		cout << "Server: Server Shutting Down.\n";
+		closesocket(listenSocketId);
+		WSACleanup();
+	}
+
+
+	SOCKET WebServer::initListenSocket() {
+		WSAData wsaData;
+		
+		if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData)) {
+			cerr << "Server: Error at WSAStartup()\n";
+			return NULL;
+		}
+
+		SOCKET socketID = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+		if (INVALID_SOCKET == socketID) {
+			cerr << "Server: Error at socket(): " << WSAGetLastError() << endl;
+			WSACleanup();
+			return NULL;
+		}
+
+		sockaddr_in serverService;
+
+		serverService.sin_addr.s_addr = INADDR_ANY;
+		serverService.sin_family = AF_INET;
+		serverService.sin_port = htons(SERVER_PORT);
+
+		if (SOCKET_ERROR == bind(socketID, (SOCKADDR*)&serverService, sizeof(serverService))) {
+			cerr << "Server: Error at bind(): " << WSAGetLastError() << endl;
+			closesocket(socketID);
+			WSACleanup();
+			return NULL;
+		}
+
+		if (SOCKET_ERROR == listen(socketID, 5)) {
+			cerr << "Server: Error at listen(): " << WSAGetLastError() << endl;
+			closesocket(socketID);
+			WSACleanup();
+			return NULL;
+		}
+
+		cout << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << SERVER_PORT << endl;
+
+		addSocket(socketID, LISTEN);
+
+		return socketID;
+	}
+
+	void WebServer::printDisconnectSocket(SOCKET* socket) {
+		struct sockaddr_in name;
+		int nameLen = sizeof(name);
+
+		if (getpeername(*socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
+			cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
+		}
+		cout << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected." << endl;
+	}
+
+	bool WebServer::addSocket(SOCKET id, int recvStatus)
+	{
+		if (sockets.size() < MAX_SOCKETS) {
+			Socket newSocket(id, recvStatus);
+			sockets.push_back(newSocket);
+			return true;
+		}
+		return false;
+	}
+
+	void WebServer::acceptConnection(Socket* socket)
+	{
+		struct sockaddr_in from;
+		int fromLen = sizeof(from);
+
+		SOCKET msgSocket = accept(socket->getSocketID(), (struct sockaddr*)&from, &fromLen);
+		if (INVALID_SOCKET == msgSocket)
+		{
+			cerr << "Server: Error at accept(): " << WSAGetLastError() << endl;
+			return;
+		}
+		cout << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
+
+		//
+		// Set the socket to be in non-blocking mode.
+		//
+		unsigned long flag = 1;
+		if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
+		{
+			cerr << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+		}
+
+		if (addSocket(msgSocket, RECEIVE) == false)
+		{
+			cout << "\t\tToo many connections, dropped!\n";
+			closesocket(socket->getSocketID());
+		}
+		return;
+	}
+
+	bool WebServer::receiveMessage(Socket* socket)
+	{
+		SOCKET msgSocket = (*socket).getSocketID();
+
+		int bytesRecv = recv(msgSocket, (*socket).getBuffer(), sizeof(*socket).getBuffer(), 0);
+
+		if (SOCKET_ERROR == bytesRecv)
+		{
+			cerr << "Server: Error at recv(): " << WSAGetLastError() << endl;
+			printDisconnectSocket(&msgSocket);
+			closesocket(msgSocket);
+			return false;
+		}
+
+		if (bytesRecv == 0)
+		{
+			printDisconnectSocket(&msgSocket);
+			closesocket(msgSocket);
+			return false;
+		}
+
+		else
+		{
+			(*socket).getBuffer()[bytesRecv] = '\0'; //add the null-terminating to make it a string
+			cout << "Server: Recieved: " << bytesRecv << " bytes of \"" << (*socket).getBuffer() << "\" message.\n";
+
+			(*socket).setSocketSendState(HANDLE_REQ);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
 			//socket.len = 0;
 			//socket 
+
+			return true;
 		}
-		return true;
+
 	}
 
-}
-
-void WebServer::sendMessage(SocketState* socket_ptr)
-{
-	int bytesSent = 0;
-	char sendBuff[255];
-
-	SOCKET msgSocket = (*socket_ptr).id;
-	strcpy(sendBuff, "response");
-
-	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
-	if (SOCKET_ERROR == bytesSent)
+	void WebServer::sendMessage(Socket* sokcet)
 	{
-		cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
-		return;
+		int bytesSent = 0;
+		char sendBuff[255];
+
+		SOCKET msgSocket = (*sokcet).getSocketID();
+		strcpy(sendBuff, "response");
+
+		bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
+		if (SOCKET_ERROR == bytesSent)
+		{
+			cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
+			return;
+		}
+
+		cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
+
+		(*sokcet).setSocketSendState(IDLE);
 	}
-
-	cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
-
-	(*socket_ptr).send = IDLE;
-}
-
-bool SocketState::operator==(const SocketState& other) const {
-	return id == other.id;
 }
