@@ -27,10 +27,10 @@ namespace web_server {
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
 		bool addSocket(SOCKET id, int recvStatus);
 		void acceptConnection(Socket* socket);
-		bool receiveMessage(Socket* socket);
+		bool receiveMessage(Socket& socket);
 		void sendMessage(Socket* socket);
 		SOCKET initListenSocket();
-		void printDisconnectSocket(SOCKET* socket);
+		void printDisconnectSocket(const SOCKET& socket);
 		void handleWaitRecv(int& numOfFD,fd_set* waitRecv);
 		void handleWaitSend(int& numOfFD,fd_set* waitSend);
 	};

@@ -18,9 +18,9 @@ namespace web_server {
 		for (it = sockets.begin(); it != sockets.end(); ++it) {
 			SocketState currSocketState = (*it).getSocketState();
 			if (currSocketState.recv == LISTEN || currSocketState.recv == RECEIVE)
-				FD_SET((*it).getSocketID(), waitRecv);
+				FD_SET((*it).GetSocketID(), waitRecv);
 			if (currSocketState.send == SEND_RESPONSE)
-				FD_SET((*it).getSocketID(), waitSend);
+				FD_SET((*it).GetSocketID(), waitSend);
 		}
 		return select(0, waitRecv, waitSend, NULL, NULL);
 	}
@@ -28,7 +28,7 @@ namespace web_server {
 	void WebServer::handleWaitRecv(int& numOfFD, fd_set* waitRecv) {
 		list<Socket>::iterator it;
 		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).getSocketID(), waitRecv))
+			if (FD_ISSET((*it).GetSocketID(), waitRecv))
 			{
 				numOfFD--;
 				switch ((*it).getSocketState().recv)
@@ -39,7 +39,7 @@ namespace web_server {
 
 				case RECEIVE:
 					// false if connection needs to shut down
-					if (false == receiveMessage(&(*it))) {
+					if (false == receiveMessage(*it)) {
 						it = sockets.erase(it);
 						--it;
 					}
@@ -51,7 +51,7 @@ namespace web_server {
 	void WebServer::handleWaitSend(int& numOfFD, fd_set* waitSend) {
 		list<Socket>::iterator it;
 		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).getSocketID(), waitSend))
+			if (FD_ISSET((*it).GetSocketID(), waitSend))
 			{
 				numOfFD--;
 				sendMessage(&(*it));
@@ -132,11 +132,11 @@ namespace web_server {
 		return socketID;
 	}
 
-	void WebServer::printDisconnectSocket(SOCKET* socket) {
+	void WebServer::printDisconnectSocket(const SOCKET& socket) {
 		struct sockaddr_in name;
 		int nameLen = sizeof(name);
 
-		if (getpeername(*socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
+		if (getpeername(socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
 			cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
 		}
 		cout << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected." << endl;
@@ -157,7 +157,7 @@ namespace web_server {
 		struct sockaddr_in from;
 		int fromLen = sizeof(from);
 
-		SOCKET msgSocket = accept(socket->getSocketID(), (struct sockaddr*)&from, &fromLen);
+		SOCKET msgSocket = accept(socket->GetSocketID(), (struct sockaddr*)&from, &fromLen);
 		if (INVALID_SOCKET == msgSocket)
 		{
 			cerr << "Server: Error at accept(): " << WSAGetLastError() << endl;
@@ -177,38 +177,38 @@ namespace web_server {
 		if (addSocket(msgSocket, RECEIVE) == false)
 		{
 			cout << "\t\tToo many connections, dropped!\n";
-			closesocket(socket->getSocketID());
+			closesocket(socket->GetSocketID());
 		}
 		return;
 	}
 
-	bool WebServer::receiveMessage(Socket* socket)
-	{
-		SOCKET msgSocket = (*socket).getSocketID();
+	bool WebServer::receiveMessage(Socket& socket) {
+		char BUFFER[2048];
+		SOCKET msgSocket = socket.GetSocketID();
 
-		int bytesRecv = recv(msgSocket, (*socket).getBuffer(), sizeof(*socket).getBuffer(), 0);
+		int bytesRecv = recv(msgSocket, BUFFER, sizeof(BUFFER), 0);
 
 		if (SOCKET_ERROR == bytesRecv)
 		{
 			cerr << "Server: Error at recv(): " << WSAGetLastError() << endl;
-			printDisconnectSocket(&msgSocket);
+			printDisconnectSocket(msgSocket);
 			closesocket(msgSocket);
 			return false;
 		}
 
 		if (bytesRecv == 0)
 		{
-			printDisconnectSocket(&msgSocket);
+			printDisconnectSocket(msgSocket);
 			closesocket(msgSocket);
 			return false;
 		}
 
 		else
 		{
-			(*socket).getBuffer()[bytesRecv] = '\0'; //add the null-terminating to make it a string
-			cout << "Server: Recieved: " << bytesRecv << " bytes of \"" << (*socket).getBuffer() << "\" message.\n";
+			BUFFER[bytesRecv] = '\0'; //add the null-terminating to make it a string
+			cout << "Server: Recieved: " << bytesRecv << " bytes of \"" << BUFFER << "\" message.\n";
 
-			(*socket).setSocketSendState(HANDLE_REQ);
+			socket.setSocketSendState(HANDLE_REQ);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
 			//socket.len = 0;
@@ -216,7 +216,6 @@ namespace web_server {
 
 			return true;
 		}
-
 	}
 
 	void WebServer::sendMessage(Socket* sokcet)
@@ -224,7 +223,7 @@ namespace web_server {
 		int bytesSent = 0;
 		char sendBuff[255];
 
-		SOCKET msgSocket = (*sokcet).getSocketID();
+		SOCKET msgSocket = (*sokcet).GetSocketID();
 		strcpy(sendBuff, "response");
 
 		bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
