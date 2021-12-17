@@ -31,7 +31,7 @@ public:
 	bool operator==(const SocketState& other) const;
 };
 
-list<SocketState>sockets;
+
 
 
 
@@ -41,6 +41,8 @@ public:
 	void Run();
 private:
 	SOCKET listenSocket;
+	list<SocketState>sockets;
+
 	void closeServer();
 	bool addSocket(SOCKET id, int what);
 	void acceptConnection(SOCKET id);
