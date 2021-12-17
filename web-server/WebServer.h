@@ -47,5 +47,6 @@ private:
 	bool receiveMessage(SocketState* socket);
 	void sendMessage(SocketState* socket_ptr);
 	void initListenSocket();
+	void printDisconnectSocket(SOCKET* socket);
 };
 
