@@ -2,53 +2,37 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <iostream>
-using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
 #include <string.h>
 #include <time.h>
 #include <list>
+#include <map>
+#include "Socket.h"
 
-const int SERVER_PORT = 27015;
-const int MAX_SOCKETS = 60;
-const int EMPTY = 0;
-const int LISTEN = 1;
-const int RECEIVE = 2;
-const int IDLE = 3;
-const int HANDLE_REQ = 4;
-const int PROC_REQUEST = 1;
-const int SEND_RESPONSE = 2;
+using namespace std;
 
-struct SocketState
-{
-	SOCKET id;			// Socket handle
-	int	recv;			// Receiving?
-	int	send;			// Sending?
-	char buffer[128];
-	int len;
+namespace web_server {
 
-public: 
-	bool operator==(const SocketState& other) const;
-};
+	const int SERVER_PORT = 27015;
+	const int MAX_SOCKETS = 60;
 
+	class WebServer
+	{
+	public:
+		void Run();
+	private:
+		list<Socket>sockets;
 
+		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
+		bool addSocket(SOCKET id, int recvStatus);
+		void acceptConnection(Socket* socket);
+		bool receiveMessage(Socket* socket);
+		void sendMessage(Socket* socket);
+		SOCKET initListenSocket();
+		void printDisconnectSocket(SOCKET* socket);
+		void handleWaitRecv(int& numOfFD,fd_set* waitRecv);
+		void handleWaitSend(int& numOfFD,fd_set* waitSend);
+	};
 
-
-
-class WebServer
-{
-public:
-	void Run();
-private:
-	SOCKET listenSocket;
-	list<SocketState>sockets;
-
-	void closeServer();
-	bool addSocket(SOCKET id, int what);
-	void acceptConnection(SOCKET id);
-	bool receiveMessage(SocketState* socket);
-	void sendMessage(SocketState* socket_ptr);
-	void initListenSocket();
-	void printDisconnectSocket(SOCKET* socket);
-};
-
+}
