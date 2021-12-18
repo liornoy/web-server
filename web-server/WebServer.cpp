@@ -194,8 +194,7 @@ namespace web_server {
 
 		int bytesRecv = recv(msgSocket, BUFFER, sizeof(BUFFER), 0);
 
-		if (SOCKET_ERROR == bytesRecv)
-		{
+		if (SOCKET_ERROR == bytesRecv) {
 			ss << "Server: Error at recv(): " << WSAGetLastError();;
 			logger->log(Err,ss.str());
 			ss.str("");
@@ -205,20 +204,19 @@ namespace web_server {
 			return false;
 		}
 
-		if (bytesRecv == 0)
-		{
+		if (bytesRecv == 0) {
 			printDisconnectSocket(msgSocket);
 			closesocket(msgSocket);
 			return false;
 		}
 
-		else
-		{
+		else {
 			BUFFER[bytesRecv] = '\0'; //add the null-terminating to make it a string
 			ss << "Server: Recieved: " << bytesRecv << " bytes of \"" << BUFFER << "\" message.";
 			logger->log(Info, ss.str());
 			ss.str("");
 			ss.clear();
+
 			socket.setSocketSendState(HANDLE_REQ);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
