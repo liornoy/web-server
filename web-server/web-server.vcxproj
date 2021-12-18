@@ -147,6 +147,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="RequestParser.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="WebServer.cpp" />

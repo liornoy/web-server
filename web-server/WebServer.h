@@ -14,16 +14,14 @@
 
 using namespace std;
 
-const int SERVER_PORT = 27015;
-const int MAX_SOCKETS = 60;
-const string SERVER_NAME = "http-web-server";
+
 
 namespace web_server {
 	class WebServer
 	{
 	public:
 		void run();
-		WebServer(int maxSockets, int serverPort,string serverName);
+		WebServer(int maxSockets, int serverPort);
 		WebServer( WebServer const&) = delete;
 		void operator=(WebServer const&) = delete;
 
