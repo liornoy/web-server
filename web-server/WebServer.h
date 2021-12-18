@@ -8,6 +8,7 @@
 #include <time.h>
 #include <list>
 #include <map>
+#include <queue>
 #include "Socket.h"
 #include "Logger.h"
 #include<sstream>
@@ -26,12 +27,13 @@ namespace web_server {
 		void operator=(WebServer const&) = delete;
 
 	private:
-		const int TIME_OUT = 120;
+		const int TIME_OUT = 5;
 		const timeval SELECT_TIME_OUT_VAL{ TIME_OUT,0 };
 		list<Socket>sockets;
 		Logger* logger;
 		int maxSockets, serverPort;
 		std::stringstream ss; 
+		list<list<Socket>::iterator> socketsToDelete;
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
 		bool addSocket(SOCKET id, int recvStatus);
@@ -40,8 +42,11 @@ namespace web_server {
 		void sendMessage(Socket* socket);
 		SOCKET initListenSocket();
 		void printDisconnectSocket(const SOCKET& socket);
-		void handleWaitRecv(int& numOfFD,fd_set* waitRecv);
-		void handleWaitSend(int& numOfFD,fd_set* waitSend);
-		void handleTimeOut();
+		void handleWaitRecv(list<Socket>::iterator& socketIterator,fd_set* waitRecv, int& numOfFD);
+		void handleWaitSend(list<Socket>::iterator& socketIterator,fd_set* waitSend, int& numOfFD);
+		void handleTimeOut(list<Socket>::iterator& socketIterator, time_t now);
+		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
+		void deleteSockets();
+
 	};
 }
