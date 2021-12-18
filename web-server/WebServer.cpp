@@ -18,8 +18,7 @@ namespace web_server {
 		fd_set waitRecv, waitSend;
 		int numOfFD;
 
-		while (true)
-		{
+		while (true) {
 			numOfFD = selectSockets(&waitRecv, &waitSend);
 
 			if (SOCKET_ERROR == numOfFD) {
@@ -27,31 +26,14 @@ namespace web_server {
 				WSACleanup();
 				return;
 			}
-			handleWaitRecv(numOfFD, &waitRecv);
-			handleWaitSend(numOfFD, &waitSend);
-			handleTimeOut();
+			handleSockets(numOfFD, &waitRecv, &waitSend);
 		}
 
 		logger->log(Info, "Server: Server Shutting Down.");
 		closesocket(listenSocketId);
 		WSACleanup();
 	}
-
-	void WebServer::handleTimeOut() {
-		list<Socket>::iterator it;
-		time_t now;
-		time(&now);
-		for (it = sockets.begin(); it != sockets.end(); ++it) {
-			time_t timePassed = now - (*it).getSocketState().lastRecvTime;
-			if (timePassed >= TIME_OUT && (*it).getSocketState().recv == RECEIVE) {
-				logger->log(Info, "Server: Client Timed Out, disconnecting...");
-				printDisconnectSocket((*it).getSocketID());
-				closesocket((*it).getSocketID());
-				it = sockets.erase(it);
-				--it;
-			}
-		}
-	}
+	
 
 	SOCKET WebServer::initListenSocket() {
 		WSAData wsaData;
@@ -99,8 +81,7 @@ namespace web_server {
 		return socketID;
 	}
 
-	bool WebServer::addSocket(SOCKET id, int recvStatus)
-	{
+	bool WebServer::addSocket(SOCKET id, int recvStatus) {
 		if (sockets.size() < maxSockets) {
 			Socket newSocket(id, recvStatus);
 			sockets.push_back(newSocket);
@@ -126,51 +107,75 @@ namespace web_server {
 		return select(0, waitRecv, waitSend, NULL, &SELECT_TIME_OUT_VAL);
 	}
 
-	void WebServer::handleWaitRecv(int& numOfFD, fd_set* waitRecv) {
-		list<Socket>::iterator it;
-		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).getSocketID(), waitRecv))
-			{
-				numOfFD--;
-				switch ((*it).getSocketState().recv)
-				{
-				case LISTEN:
-					acceptConnection((*it));
-					break;
+	void WebServer::handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend) {
+		list<Socket>::iterator socketIterator;
 
-				case RECEIVE:
-					// false if connection needs to shut down
-					if (false == receiveMessage(*it)) {
-						printDisconnectSocket((*it).getSocketID());
-						closesocket((*it).getSocketID());
-						it = sockets.erase(it);
-						--it;
-					}
-					break;
+		time_t now;
+		time(&now);
+
+		for (socketIterator = sockets.begin(); socketIterator != sockets.end(); ++socketIterator) {
+			if (numOfFD > 0) {
+				handleWaitRecv(socketIterator, waitRecv, numOfFD);
+				handleWaitSend(socketIterator, waitSend, numOfFD);
+			}
+
+			handleTimeOut(socketIterator, now);
+		}
+
+		deleteSockets();
+	}
+
+	void WebServer::handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set * waitRecv, int& numOfFD) {
+		if (FD_ISSET((*socketIterator).getSocketID(), waitRecv)) {
+			numOfFD--;
+			switch ((*socketIterator).getSocketState().recv) {
+			case LISTEN:
+				acceptConnection(*socketIterator);
+				break;
+
+			case RECEIVE:
+				// false if connection needs to shut down
+				if (false == receiveMessage(*socketIterator)) {
+					socketsToDelete.push_back(socketIterator);
 				}
+				break;
 			}
 		}
 	}
 
-	void WebServer::handleWaitSend(int& numOfFD, fd_set* waitSend) {
-		list<Socket>::iterator it;
-		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).getSocketID(), waitSend))
-			{
-				numOfFD--;
-				sendMessage(&(*it));
-			}
+	void WebServer::handleWaitSend(list<Socket>::iterator& socketIterator, fd_set * waitSend, int& numOfFD) {
+		if (FD_ISSET((*socketIterator).getSocketID(), waitSend)) {
+			numOfFD--;
+			sendMessage(&(*socketIterator));
+		}
+	}
+	void WebServer::handleTimeOut(list<Socket>::iterator& socketIterator, time_t now) {
+		time_t timePassed = now - (*socketIterator).getSocketState().lastRecvTime;
+
+		if (timePassed >= TIME_OUT && (*socketIterator).getSocketState().recv == RECEIVE) {
+			logger->log(Info, "Server: Client Timed Out, disconnecting...");
+			socketsToDelete.push_back(socketIterator);
 		}
 	}
 
-	void WebServer::acceptConnection(Socket& socket)
-	{
+	void WebServer::deleteSockets() {
+		auto it = socketsToDelete.begin();
+		while (it != socketsToDelete.end()) {
+			printDisconnectSocket((*(*it)).getSocketID());
+			closesocket((*(*it)).getSocketID());
+			sockets.erase((*it));
+			it++;
+		}
+
+		socketsToDelete.clear();
+	}
+
+	void WebServer::acceptConnection(Socket& socket) {
 		struct sockaddr_in from;
 		int fromLen = sizeof(from);
 
 		SOCKET msgSocket = accept(socket.getSocketID(), (struct sockaddr*)&from, &fromLen);
-		if (INVALID_SOCKET == msgSocket)
-		{
+		if (INVALID_SOCKET == msgSocket) {
 			ss << "Server: Error at accept(): " << WSAGetLastError() << endl;
 			logger->log(Err, ss.str());
 			ss.str("");
@@ -181,24 +186,24 @@ namespace web_server {
 		logger->log(Info, ss.str());
 		ss.str("");
 		ss.clear();
+
 		//
 		// Set the socket to be in non-blocking mode.
 		//
 		unsigned long flag = 1;
-		if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
-		{
+		if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0) {
 			ss << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
 			logger->log(Err, ss.str());
 			ss.str("");
 			ss.clear();
 		}
 
-		if (addSocket(msgSocket, RECEIVE) == false)
-		{
+		if (addSocket(msgSocket, RECEIVE) == false) {
 			logger->log(Info, "\t\tToo many connections, dropped!");
 			closesocket(socket.getSocketID());
 		}
 	}
+
 	bool WebServer::receiveMessage(Socket& socket) {
 		char BUFFER[2048];
 		SOCKET msgSocket = socket.getSocketID();
@@ -235,8 +240,7 @@ namespace web_server {
 		}
 	}
 
-	void WebServer::sendMessage(Socket* sokcet)
-	{
+	void WebServer::sendMessage(Socket* sokcet) {
 		int bytesSent = 0;
 		char sendBuff[255];
 
@@ -244,8 +248,7 @@ namespace web_server {
 		strcpy(sendBuff, "response");
 
 		bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
-		if (SOCKET_ERROR == bytesSent)
-		{
+		if (SOCKET_ERROR == bytesSent) {
 			cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
 			return;
 		}
