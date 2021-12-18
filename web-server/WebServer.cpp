@@ -1,13 +1,7 @@
 #include "WebServer.h"
 
-void main()
-{
-	web_server::WebServer server(MAX_SOCKETS, SERVER_PORT, SERVER_NAME);
-	server.run();
-}
-
 namespace web_server {
-	WebServer::WebServer(int maxSockets, int serverPort, string serverName) {
+	WebServer::WebServer(int maxSockets, int serverPort) {
 		this->maxSockets = maxSockets;
 		this->serverPort = serverPort;
 		this->logger = &Logger::instance();
@@ -79,7 +73,7 @@ namespace web_server {
 			return NULL;
 		}
 
-		ss << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << SERVER_PORT;
+		ss << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << serverPort;
 		logger->log(Info, ss.str());
 		ss.str("");
 		ss.clear();
