@@ -9,24 +9,33 @@
 #include <list>
 #include <map>
 #include "Socket.h"
+#include "Logger.h"
+#include<sstream>
 
 using namespace std;
 
+const int SERVER_PORT = 27015;
+const int MAX_SOCKETS = 60;
+const string SERVER_NAME = "http-web-server";
+
 namespace web_server {
-
-	const int SERVER_PORT = 27015;
-	const int MAX_SOCKETS = 60;
-
 	class WebServer
 	{
 	public:
-		void Run();
+		void run();
+		WebServer(int maxSockets, int serverPort,string serverName);
+		WebServer( WebServer const&) = delete;
+		void operator=(WebServer const&) = delete;
+
 	private:
 		list<Socket>sockets;
+		Logger* logger;
+		int maxSockets, serverPort;
+		std::stringstream ss; 
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
 		bool addSocket(SOCKET id, int recvStatus);
-		void acceptConnection(Socket* socket);
+		void acceptConnection(Socket& socket);
 		bool receiveMessage(Socket& socket);
 		void sendMessage(Socket* socket);
 		SOCKET initListenSocket();
@@ -34,5 +43,4 @@ namespace web_server {
 		void handleWaitRecv(int& numOfFD,fd_set* waitRecv);
 		void handleWaitSend(int& numOfFD,fd_set* waitSend);
 	};
-
 }

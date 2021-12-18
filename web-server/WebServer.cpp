@@ -2,11 +2,16 @@
 
 void main()
 {
-	web_server::WebServer server;
-	server.Run();
+	web_server::WebServer server(MAX_SOCKETS, SERVER_PORT, SERVER_NAME);
+	server.run();
 }
 
 namespace web_server {
+	WebServer::WebServer(int maxSockets, int serverPort, string serverName) {
+		this->maxSockets = maxSockets;
+		this->serverPort = serverPort;
+		this->logger = &Logger::instance();
+	}
 
 	int WebServer::selectSockets(fd_set* waitRecv, fd_set* waitSend) {
 
@@ -34,7 +39,7 @@ namespace web_server {
 				switch ((*it).getSocketState().recv)
 				{
 				case LISTEN:
-					acceptConnection(&(*it));
+					acceptConnection((*it));
 					break;
 
 				case RECEIVE:
@@ -58,7 +63,7 @@ namespace web_server {
 			}
 		}
 	}
-	void WebServer::Run() {
+	void WebServer::run() {
 		// Init Server's Listen Socket
 		SOCKET listenSocketId = initListenSocket();
 
@@ -83,7 +88,7 @@ namespace web_server {
 			}
 		
 
-		cout << "Server: Server Shutting Down.\n";
+		logger->log(Info,"Server: Server Shutting Down.");
 		closesocket(listenSocketId);
 		WSACleanup();
 	}
@@ -125,7 +130,10 @@ namespace web_server {
 			return NULL;
 		}
 
-		cout << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << SERVER_PORT << endl;
+		ss << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << SERVER_PORT;
+		logger->log(Info, ss.str());
+		ss.str("");
+		ss.clear();
 
 		addSocket(socketID, LISTEN);
 
@@ -139,7 +147,11 @@ namespace web_server {
 		if (getpeername(socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
 			cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
 		}
-		cout << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected." << endl;
+
+		ss << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected.";
+		logger->log(Info, ss.str());
+		ss.str("");
+		ss.clear();
 	}
 
 	bool WebServer::addSocket(SOCKET id, int recvStatus)
@@ -152,32 +164,40 @@ namespace web_server {
 		return false;
 	}
 
-	void WebServer::acceptConnection(Socket* socket)
+	void WebServer::acceptConnection(Socket& socket)
 	{
 		struct sockaddr_in from;
 		int fromLen = sizeof(from);
 
-		SOCKET msgSocket = accept(socket->GetSocketID(), (struct sockaddr*)&from, &fromLen);
+		SOCKET msgSocket = accept(socket.GetSocketID(), (struct sockaddr*)&from, &fromLen);
 		if (INVALID_SOCKET == msgSocket)
 		{
-			cerr << "Server: Error at accept(): " << WSAGetLastError() << endl;
+			ss << "Server: Error at accept(): " << WSAGetLastError() << endl;
+			logger->log(Err, ss.str());
+			ss.str("");
+			ss.clear();
 			return;
 		}
-		cout << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
-
+		ss << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected.";
+		logger->log(Info, ss.str());
+		ss.str("");
+		ss.clear();
 		//
 		// Set the socket to be in non-blocking mode.
 		//
 		unsigned long flag = 1;
 		if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
 		{
-			cerr << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+			ss << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+			logger->log(Err, ss.str());
+			ss.str("");
+			ss.clear();
 		}
 
 		if (addSocket(msgSocket, RECEIVE) == false)
 		{
-			cout << "\t\tToo many connections, dropped!\n";
-			closesocket(socket->GetSocketID());
+			logger->log(Info, "\t\tToo many connections, dropped!");
+			closesocket(socket.GetSocketID());
 		}
 		return;
 	}
@@ -190,7 +210,10 @@ namespace web_server {
 
 		if (SOCKET_ERROR == bytesRecv)
 		{
-			cerr << "Server: Error at recv(): " << WSAGetLastError() << endl;
+			ss << "Server: Error at recv(): " << WSAGetLastError();;
+			logger->log(Err,ss.str());
+			ss.str("");
+			ss.clear();
 			printDisconnectSocket(msgSocket);
 			closesocket(msgSocket);
 			return false;
@@ -206,8 +229,10 @@ namespace web_server {
 		else
 		{
 			BUFFER[bytesRecv] = '\0'; //add the null-terminating to make it a string
-			cout << "Server: Recieved: " << bytesRecv << " bytes of \"" << BUFFER << "\" message.\n";
-
+			ss << "Server: Recieved: " << bytesRecv << " bytes of \"" << BUFFER << "\" message.";
+			logger->log(Info, ss.str());
+			ss.str("");
+			ss.clear();
 			socket.setSocketSendState(HANDLE_REQ);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
@@ -233,7 +258,10 @@ namespace web_server {
 			return;
 		}
 
-		cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
+		ss << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.";
+		logger->log(Info, ss.str());
+		ss.str("");
+		ss.clear();
 
 		(*sokcet).setSocketSendState(IDLE);
 	}
