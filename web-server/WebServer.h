@@ -26,6 +26,8 @@ namespace web_server {
 		void operator=(WebServer const&) = delete;
 
 	private:
+		const int TIME_OUT = 120;
+		const timeval SELECT_TIME_OUT_VAL{ TIME_OUT,0 };
 		list<Socket>sockets;
 		Logger* logger;
 		int maxSockets, serverPort;
@@ -40,5 +42,6 @@ namespace web_server {
 		void printDisconnectSocket(const SOCKET& socket);
 		void handleWaitRecv(int& numOfFD,fd_set* waitRecv);
 		void handleWaitSend(int& numOfFD,fd_set* waitSend);
+		void handleTimeOut();
 	};
 }

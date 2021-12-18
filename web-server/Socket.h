@@ -4,6 +4,8 @@
 #include <iostream>
 #pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
+#include <time.h>
+
 namespace web_server {
 	const int LISTEN = 0;
 	const int RECEIVE = 1;
@@ -16,6 +18,7 @@ namespace web_server {
 	{
 		int recv;			
 		int	send;			// Sending?
+		time_t lastRecvTime;
 	};
 
 	class Socket
@@ -27,9 +30,10 @@ namespace web_server {
 
 	public:
 		Socket(SOCKET id, int recvStatus); 
-		const SOCKET GetSocketID()const { return id; }
+		const SOCKET getSocketID()const { return id; }
 		const SocketState getSocketState()const { return socketState; }
-		void setSocketSendState(int newState){ socketState.send = newState; }
+		void setSocketSendState(int newState);
+		void setSocketLastRecv();
 		bool operator==(const Socket& other) const;
 	};
 }

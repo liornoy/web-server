@@ -29,12 +29,28 @@ namespace web_server {
 			}
 			handleWaitRecv(numOfFD, &waitRecv);
 			handleWaitSend(numOfFD, &waitSend);
+			handleTimeOut();
 		}
-
 
 		logger->log(Info, "Server: Server Shutting Down.");
 		closesocket(listenSocketId);
 		WSACleanup();
+	}
+
+	void WebServer::handleTimeOut() {
+		list<Socket>::iterator it;
+		time_t now;
+		time(&now);
+		for (it = sockets.begin(); it != sockets.end(); ++it) {
+			time_t timePassed = now - (*it).getSocketState().lastRecvTime;
+			if (timePassed >= TIME_OUT && (*it).getSocketState().recv == RECEIVE) {
+				logger->log(Info, "Server: Client Timed Out, disconnecting...");
+				printDisconnectSocket((*it).getSocketID());
+				closesocket((*it).getSocketID());
+				it = sockets.erase(it);
+				--it;
+			}
+		}
 	}
 
 	SOCKET WebServer::initListenSocket() {
@@ -102,17 +118,18 @@ namespace web_server {
 		for (it = sockets.begin(); it != sockets.end(); ++it) {
 			SocketState currSocketState = (*it).getSocketState();
 			if (currSocketState.recv == LISTEN || currSocketState.recv == RECEIVE)
-				FD_SET((*it).GetSocketID(), waitRecv);
+				FD_SET((*it).getSocketID(), waitRecv);
 			if (currSocketState.send == SEND_RESPONSE)
-				FD_SET((*it).GetSocketID(), waitSend);
+				FD_SET((*it).getSocketID(), waitSend);
 		}
-		return select(0, waitRecv, waitSend, NULL, NULL);
+
+		return select(0, waitRecv, waitSend, NULL, &SELECT_TIME_OUT_VAL);
 	}
 
 	void WebServer::handleWaitRecv(int& numOfFD, fd_set* waitRecv) {
 		list<Socket>::iterator it;
 		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).GetSocketID(), waitRecv))
+			if (FD_ISSET((*it).getSocketID(), waitRecv))
 			{
 				numOfFD--;
 				switch ((*it).getSocketState().recv)
@@ -124,6 +141,8 @@ namespace web_server {
 				case RECEIVE:
 					// false if connection needs to shut down
 					if (false == receiveMessage(*it)) {
+						printDisconnectSocket((*it).getSocketID());
+						closesocket((*it).getSocketID());
 						it = sockets.erase(it);
 						--it;
 					}
@@ -136,7 +155,7 @@ namespace web_server {
 	void WebServer::handleWaitSend(int& numOfFD, fd_set* waitSend) {
 		list<Socket>::iterator it;
 		for (it = sockets.begin(); it != sockets.end() && numOfFD > 0; ++it) {
-			if (FD_ISSET((*it).GetSocketID(), waitSend))
+			if (FD_ISSET((*it).getSocketID(), waitSend))
 			{
 				numOfFD--;
 				sendMessage(&(*it));
@@ -149,7 +168,7 @@ namespace web_server {
 		struct sockaddr_in from;
 		int fromLen = sizeof(from);
 
-		SOCKET msgSocket = accept(socket.GetSocketID(), (struct sockaddr*)&from, &fromLen);
+		SOCKET msgSocket = accept(socket.getSocketID(), (struct sockaddr*)&from, &fromLen);
 		if (INVALID_SOCKET == msgSocket)
 		{
 			ss << "Server: Error at accept(): " << WSAGetLastError() << endl;
@@ -177,14 +196,12 @@ namespace web_server {
 		if (addSocket(msgSocket, RECEIVE) == false)
 		{
 			logger->log(Info, "\t\tToo many connections, dropped!");
-			closesocket(socket.GetSocketID());
+			closesocket(socket.getSocketID());
 		}
-		return;
 	}
-
 	bool WebServer::receiveMessage(Socket& socket) {
 		char BUFFER[2048];
-		SOCKET msgSocket = socket.GetSocketID();
+		SOCKET msgSocket = socket.getSocketID();
 
 		int bytesRecv = recv(msgSocket, BUFFER, sizeof(BUFFER), 0);
 
@@ -193,14 +210,10 @@ namespace web_server {
 			logger->log(Err,ss.str());
 			ss.str("");
 			ss.clear();
-			printDisconnectSocket(msgSocket);
-			closesocket(msgSocket);
 			return false;
 		}
 
 		if (bytesRecv == 0) {
-			printDisconnectSocket(msgSocket);
-			closesocket(msgSocket);
 			return false;
 		}
 
@@ -211,6 +224,7 @@ namespace web_server {
 			ss.str("");
 			ss.clear();
 
+			socket.setSocketLastRecv();
 			socket.setSocketSendState(HANDLE_REQ);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
@@ -226,7 +240,7 @@ namespace web_server {
 		int bytesSent = 0;
 		char sendBuff[255];
 
-		SOCKET msgSocket = (*sokcet).GetSocketID();
+		SOCKET msgSocket = (*sokcet).getSocketID();
 		strcpy(sendBuff, "response");
 
 		bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
