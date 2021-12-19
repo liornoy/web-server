@@ -1,21 +1,22 @@
 #pragma once
+#pragma comment(lib, "Ws2_32.lib")
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <iostream>
-#pragma comment(lib, "Ws2_32.lib")
+
 #include <winsock2.h>
+#include <iostream>
 #include <string.h>
+#include <sstream> 
 #include <time.h>
+#include <queue>
 #include <list>
 #include <map>
-#include <queue>
+
 #include "Socket.h"
 #include "Logger.h"
-#include<sstream>
+
 #include "RequestParser.h"
 using namespace std;
-
-
 
 namespace web_server {
 	class WebServer
@@ -48,6 +49,5 @@ namespace web_server {
 		void handleInComingRequests(list<Socket>::iterator& socketIterator);
 		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
 		void deleteSockets();
-	
 	};
 }

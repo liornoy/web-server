@@ -131,6 +131,7 @@ namespace web_server {
 		}
 
 		Request req = RequestParser::ParseRequest((*socketIterator).getInComingResponse());
+		((*socketIterator).setOutGoingResponse(HTTPRequestHandler::HandleRequest(req));
 		//response = RESPONSE CREATOR (REQ)
 		// socket.setSocketState.send(sendResponse)
 	}

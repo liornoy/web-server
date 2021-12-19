@@ -37,7 +37,7 @@ namespace web_server {
 		char* getOutGoingResponse();
 		char* getInComingResponse();
 
-		
+		void setOutGoingResponse(char* msg);
 		void setInComingRequest(char* msg);
 	};
 }

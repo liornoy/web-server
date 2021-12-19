@@ -4,7 +4,7 @@ namespace web_server {
 	class RequestParser
 	{
 	public:
-		static Request ParseRequest(string request);
+		static Request ParseRequest(string inComingMsg);
 	};
 
 }
