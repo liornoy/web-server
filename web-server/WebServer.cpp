@@ -118,11 +118,21 @@ namespace web_server {
 				handleWaitRecv(socketIterator, waitRecv, numOfFD);
 				handleWaitSend(socketIterator, waitSend, numOfFD);
 			}
-
+			handleInComingRequests(socketIterator);
 			handleTimeOut(socketIterator, now);
 		}
 
 		deleteSockets();
+	}
+
+	void WebServer::handleInComingRequests(list<Socket>::iterator& socketIterator) {
+		if ((*socketIterator).getSocketState().send != HANDLE_REQ) {
+			return;
+		}
+
+		Request req = RequestParser::ParseRequest((*socketIterator).getInComingResponse());
+		//response = RESPONSE CREATOR (REQ)
+		// socket.setSocketState.send(sendResponse)
 	}
 
 	void WebServer::handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set * waitRecv, int& numOfFD) {
@@ -149,6 +159,7 @@ namespace web_server {
 			sendMessage(&(*socketIterator));
 		}
 	}
+
 	void WebServer::handleTimeOut(list<Socket>::iterator& socketIterator, time_t now) {
 		time_t timePassed = now - (*socketIterator).getSocketState().lastRecvTime;
 
@@ -205,14 +216,14 @@ namespace web_server {
 	}
 
 	bool WebServer::receiveMessage(Socket& socket) {
-		char BUFFER[2048];
+		char buffer[MAX_MSG_SIZE];
 		SOCKET msgSocket = socket.getSocketID();
 
-		int bytesRecv = recv(msgSocket, BUFFER, sizeof(BUFFER), 0);
+		int bytesRecv = recv(msgSocket, buffer, sizeof(buffer), 0);
 
 		if (SOCKET_ERROR == bytesRecv) {
 			ss << "Server: Error at recv(): " << WSAGetLastError();;
-			logger->log(Err,ss.str());
+			logger->log(Err, ss.str());
 			ss.str("");
 			ss.clear();
 			return false;
@@ -223,41 +234,39 @@ namespace web_server {
 		}
 
 		else {
-			BUFFER[bytesRecv] = '\0'; //add the null-terminating to make it a string
-			ss << "Server: Recieved: " << bytesRecv << " bytes of \"" << BUFFER << "\" message.";
+			buffer[bytesRecv] = '\0'; //add the null-terminating to make it a string
+			ss << "Server: Recieved: " << bytesRecv << " bytes of \"" << buffer << "\" message.";
 			logger->log(Info, ss.str());
 			ss.str("");
 			ss.clear();
 
 			socket.setSocketLastRecv();
-			socket.setSocketSendState(SEND_RESPONSE);
-			//Request request = new Request (socket.id, socket.buffer);
-			//socket.buff = 0;
-			//socket 
+			socket.setSocketSendState(HANDLE_REQ);
+			socket.setInComingRequest(buffer);
 
 			return true;
 		}
 	}
 
-	void WebServer::sendMessage(Socket* sokcet) {
+	void WebServer::sendMessage(Socket* sokcetPtr) {
 		int bytesSent = 0;
-		char sendBuff[255];
 
-		SOCKET msgSocket = (*sokcet).getSocketID();
-		strcpy(sendBuff, "response");
+		SOCKET msgSocket = (*sokcetPtr).getSocketID();
 
-		bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
+		bytesSent = send(msgSocket, sokcetPtr->getOutGoingResponse(), (int)strlen(sokcetPtr->getOutGoingResponse()), 0);
 		if (SOCKET_ERROR == bytesSent) {
 			cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
 			return;
 		}
 
-		ss << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.";
+		ss << "Server: Sent: " << bytesSent << "\\" << strlen(sokcetPtr->getOutGoingResponse()) << \
+			  " bytes of \"" << sokcetPtr->getOutGoingResponse() << "\" message.";
+
 		logger->log(Info, ss.str());
 		ss.str("");
 		ss.clear();
 
-		(*sokcet).setSocketSendState(IDLE);
+		(*sokcetPtr).setSocketSendState(IDLE);
 	}
 
 	void WebServer::printDisconnectSocket(const SOCKET& socket) {

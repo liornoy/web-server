@@ -12,7 +12,7 @@
 #include "Socket.h"
 #include "Logger.h"
 #include<sstream>
-
+#include "RequestParser.h"
 using namespace std;
 
 
@@ -45,8 +45,9 @@ namespace web_server {
 		void handleWaitRecv(list<Socket>::iterator& socketIterator,fd_set* waitRecv, int& numOfFD);
 		void handleWaitSend(list<Socket>::iterator& socketIterator,fd_set* waitSend, int& numOfFD);
 		void handleTimeOut(list<Socket>::iterator& socketIterator, time_t now);
+		void handleInComingRequests(list<Socket>::iterator& socketIterator);
 		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
 		void deleteSockets();
-
+	
 	};
 }

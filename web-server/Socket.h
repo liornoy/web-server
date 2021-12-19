@@ -11,9 +11,8 @@ namespace web_server {
 	const int RECEIVE = 1;
 	const int IDLE = 2;
 	const int HANDLE_REQ = 3;
-	const int PROC_REQUEST = 4;
-	const int SEND_RESPONSE = 5;
-
+	const int SEND_RESPONSE = 4;
+	const int MAX_MSG_SIZE = 2048;
 	struct SocketState
 	{
 		int recv;			
@@ -26,7 +25,7 @@ namespace web_server {
 	private:
 		SOCKET id;
 		SocketState socketState;
-		char buffer[128];
+		char inComingRequest[MAX_MSG_SIZE], outgoingResponse[MAX_MSG_SIZE];
 
 	public:
 		Socket(SOCKET id, int recvStatus); 
@@ -35,5 +34,10 @@ namespace web_server {
 		void setSocketSendState(int newState);
 		void setSocketLastRecv();
 		bool operator==(const Socket& other) const;
+		char* getOutGoingResponse();
+		char* getInComingResponse();
+
+		
+		void setInComingRequest(char* msg);
 	};
 }

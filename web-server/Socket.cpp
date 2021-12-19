@@ -9,6 +9,7 @@ namespace web_server {
 	}
 
 	bool Socket::operator==(const Socket& other) const {
+
 		return id == other.id;
 	}
 
@@ -18,5 +19,20 @@ namespace web_server {
 
 	void Socket::setSocketSendState(int newState) { 
 		socketState.send = newState;
+	}
+	void Socket::setInComingRequest(char* msg) {
+		this->inComingRequest[0] = '\0';
+		if (strlen(msg) < MAX_MSG_SIZE) {
+			strcpy(inComingRequest, msg);
+		}
+	}
+
+	char* Socket::getOutGoingResponse() {
+
+		return outgoingResponse;
+	}
+	char* Socket::getInComingResponse() {
+
+		return inComingRequest; 
 	}
 }
