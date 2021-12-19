@@ -230,10 +230,9 @@ namespace web_server {
 			ss.clear();
 
 			socket.setSocketLastRecv();
-			socket.setSocketSendState(HANDLE_REQ);
+			socket.setSocketSendState(SEND_RESPONSE);
 			//Request request = new Request (socket.id, socket.buffer);
 			//socket.buff = 0;
-			//socket.len = 0;
 			//socket 
 
 			return true;

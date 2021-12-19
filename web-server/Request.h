@@ -5,16 +5,20 @@
 
 using namespace std;
 namespace web_server {
-	enum MethodType_enum { GET_REQ, OPTIONS_REQ, HEAD_REQ, POST_REQ, PUT_REQ, DELETE_REQ, TRACE_REQ };
+	enum MethodType { GET_REQ, OPTIONS_REQ, HEAD_REQ, POST_REQ, PUT_REQ, DELETE_REQ, TRACE_REQ };
+	enum HTTPVersion { HTTPDOT0, HTTPDOT1 };
+	const string HTTPVerDot1 = "HTTP / 1.1";
+	const string HTTPVetDot0 = "HTTP / 1.0";
 
-	typedef struct RequestHeader {
-		MethodType_enum methodType;
+	typedef struct RequestLine {
+		MethodType methodToken;
 		string requestUri;
-		map<string, string>requestHeaderFields;
-	}RequestHeader;
+		HTTPVersion protocolVersion;
+	}RequestLine;
 
 	typedef struct Request {
-		RequestHeader header;
+		RequestLine requestLine;
+		map<string, string>requestHeaderFields;
 		string body;
 	}Request;
 }
