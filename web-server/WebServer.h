@@ -21,7 +21,7 @@ namespace web_server {
 	public:
 		void run();
 		WebServer(int maxSockets, int serverPort);
-		WebServer( WebServer const&) = delete;
+		WebServer(WebServer const&) = delete;
 		void operator=(WebServer const&) = delete;
 
 	private:
@@ -30,7 +30,7 @@ namespace web_server {
 		list<Socket>sockets;
 		Logger* logger;
 		int maxSockets, serverPort;
-		std::stringstream ss; 
+		std::stringstream ss;
 		list<list<Socket>::iterator> socketsToDelete;
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
@@ -40,8 +40,8 @@ namespace web_server {
 		void sendMessage(Socket* socket);
 		SOCKET initListenSocket();
 		void printDisconnectSocket(const SOCKET& socket);
-		void handleWaitRecv(list<Socket>::iterator& socketIterator,fd_set* waitRecv, int& numOfFD);
-		void handleWaitSend(list<Socket>::iterator& socketIterator,fd_set* waitSend, int& numOfFD);
+		void handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set* waitRecv, int& numOfFD);
+		void handleWaitSend(list<Socket>::iterator& socketIterator, fd_set* waitSend, int& numOfFD);
 		void handleTimeOut(list<Socket>::iterator& socketIterator, time_t now);
 		void handleInComingRequests(list<Socket>::iterator& socketIterator);
 		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);

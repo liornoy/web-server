@@ -33,7 +33,6 @@ namespace web_server {
 		closesocket(listenSocketId);
 		WSACleanup();
 	}
-	
 
 	SOCKET WebServer::initListenSocket() {
 		WSAData wsaData;
@@ -135,7 +134,7 @@ namespace web_server {
 		// socket.setSocketState.send(sendResponse)
 	}
 
-	void WebServer::handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set * waitRecv, int& numOfFD) {
+	void WebServer::handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set* waitRecv, int& numOfFD) {
 		if (FD_ISSET((*socketIterator).getSocketID(), waitRecv)) {
 			numOfFD--;
 			switch ((*socketIterator).getSocketState().recv) {
@@ -153,7 +152,7 @@ namespace web_server {
 		}
 	}
 
-	void WebServer::handleWaitSend(list<Socket>::iterator& socketIterator, fd_set * waitSend, int& numOfFD) {
+	void WebServer::handleWaitSend(list<Socket>::iterator& socketIterator, fd_set* waitSend, int& numOfFD) {
 		if (FD_ISSET((*socketIterator).getSocketID(), waitSend)) {
 			numOfFD--;
 			sendMessage(&(*socketIterator));
@@ -260,7 +259,7 @@ namespace web_server {
 		}
 
 		ss << "Server: Sent: " << bytesSent << "\\" << strlen(sokcetPtr->getOutGoingResponse()) << \
-			  " bytes of \"" << sokcetPtr->getOutGoingResponse() << "\" message.";
+			" bytes of \"" << sokcetPtr->getOutGoingResponse() << "\" message.";
 
 		logger->log(Info, ss.str());
 		ss.str("");

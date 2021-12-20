@@ -18,7 +18,7 @@ namespace web_server {
 	map<string, string>RequestParser::extractRequestHeaderFields(string inComingMsg, int& readIndex) {
 		map<string, string> requestHeaderFields;
 		// enter logic...
-		
+
 		return requestHeaderFields;
 	}
 	string RequestParser::extractRequestBody(string inComingMsg, int& readIndex) {
