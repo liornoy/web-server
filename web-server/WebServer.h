@@ -15,8 +15,6 @@
 #include "RequestParser.h"
 using namespace std;
 
-
-
 namespace web_server {
 	class WebServer
 	{
@@ -48,6 +46,5 @@ namespace web_server {
 		void handleInComingRequests(list<Socket>::iterator& socketIterator);
 		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
 		void deleteSockets();
-	
 	};
 }
