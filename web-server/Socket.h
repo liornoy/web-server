@@ -15,7 +15,7 @@ namespace web_server {
 	const int MAX_MSG_SIZE = 2048;
 	struct SocketState
 	{
-		int recv;			
+		int recv;
 		int	send;			// Sending?
 		time_t lastRecvTime;
 	};
@@ -28,7 +28,7 @@ namespace web_server {
 		char inComingRequest[MAX_MSG_SIZE], outgoingResponse[MAX_MSG_SIZE];
 
 	public:
-		Socket(SOCKET id, int recvStatus); 
+		Socket(SOCKET id, int recvStatus);
 		const SOCKET getSocketID()const { return id; }
 		const SocketState getSocketState()const { return socketState; }
 		void setSocketSendState(int newState);
@@ -37,7 +37,6 @@ namespace web_server {
 		char* getOutGoingResponse();
 		char* getInComingResponse();
 
-		
 		void setInComingRequest(char* msg);
 	};
 }
