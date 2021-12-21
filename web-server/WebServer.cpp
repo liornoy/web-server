@@ -20,9 +20,8 @@ namespace web_server {
 
 		while (true) {
 			numOfFD = selectSockets(&waitRecv, &waitSend);
-
 			if (SOCKET_ERROR == numOfFD) {
-				cerr << "Server: Error at select(): " << WSAGetLastError() << endl;
+				logger->log(Err, "Server: Error at select(): " + to_string(WSAGetLastError()));
 				WSACleanup();
 				return;
 			}
@@ -38,14 +37,14 @@ namespace web_server {
 		WSAData wsaData;
 
 		if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData)) {
-			cerr << "Server: Error at WSAStartup()\n";
+			logger->log(Err, "Server: Error at WSAStartup()");
 			return NULL;
 		}
 
 		SOCKET socketID = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 		if (INVALID_SOCKET == socketID) {
-			cerr << "Server: Error at socket(): " << WSAGetLastError() << endl;
+			logger->log(Err, "Server: Error at socket(): " + to_string(WSAGetLastError()));
 			WSACleanup();
 			return NULL;
 		}
@@ -57,23 +56,20 @@ namespace web_server {
 		serverService.sin_port = htons(serverPort);
 
 		if (SOCKET_ERROR == bind(socketID, (SOCKADDR*)&serverService, sizeof(serverService))) {
-			cerr << "Server: Error at bind(): " << WSAGetLastError() << endl;
+			logger->log(Err, "Server: Error at bind(): " + to_string(WSAGetLastError()));
 			closesocket(socketID);
 			WSACleanup();
 			return NULL;
 		}
 
 		if (SOCKET_ERROR == listen(socketID, 5)) {
-			cerr << "Server: Error at listen(): " << WSAGetLastError() << endl;
+			logger->log(Err, "Server: Error at listen(): " + to_string(WSAGetLastError()));
 			closesocket(socketID);
 			WSACleanup();
 			return NULL;
 		}
 
-		ss << "Server is ready and running on address " << inet_ntoa(serverService.sin_addr) << ":" << serverPort;
-		logger->log(Info, ss.str());
-		ss.str("");
-		ss.clear();
+		logger->log(Info, "Server is ready and running on address " + string(inet_ntoa(serverService.sin_addr)) + ":" + to_string(serverPort));
 
 		addSocket(socketID, LISTEN);
 
@@ -186,30 +182,21 @@ namespace web_server {
 
 		SOCKET msgSocket = accept(socket.getSocketID(), (struct sockaddr*)&from, &fromLen);
 		if (INVALID_SOCKET == msgSocket) {
-			ss << "Server: Error at accept(): " << WSAGetLastError() << endl;
-			logger->log(Err, ss.str());
-			ss.str("");
-			ss.clear();
+			logger->log(Err, "Server: Error at accept(): " + to_string(WSAGetLastError()));
 			return;
 		}
-		ss << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected.";
-		logger->log(Info, ss.str());
-		ss.str("");
-		ss.clear();
-
+		logger->log(Info, "Server: Client " + string(inet_ntoa(from.sin_addr)) + ":" + to_string(ntohs(from.sin_port)) + " is connected.");
+		
 		//
 		// Set the socket to be in non-blocking mode.
 		//
 		unsigned long flag = 1;
 		if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0) {
-			ss << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
-			logger->log(Err, ss.str());
-			ss.str("");
-			ss.clear();
+			logger->log(Err, "Server: Error at ioctlsocket(): " + to_string(WSAGetLastError()));
 		}
 
 		if (addSocket(msgSocket, RECEIVE) == false) {
-			logger->log(Info, "\t\tToo many connections, dropped!");
+			logger->log(Info, "Too many connections, dropped!");
 			closesocket(socket.getSocketID());
 		}
 	}
@@ -221,10 +208,7 @@ namespace web_server {
 		int bytesRecv = recv(msgSocket, buffer, sizeof(buffer), 0);
 
 		if (SOCKET_ERROR == bytesRecv) {
-			ss << "Server: Error at recv(): " << WSAGetLastError();;
-			logger->log(Err, ss.str());
-			ss.str("");
-			ss.clear();
+			logger->log(Err, "Server: Error at recv(): " + to_string(WSAGetLastError()));
 			return false;
 		}
 
@@ -234,10 +218,7 @@ namespace web_server {
 
 		else {
 			buffer[bytesRecv] = '\0'; //add the null-terminating to make it a string
-			ss << "Server: Recieved: " << bytesRecv << " bytes of \"" << buffer << "\" message.";
-			logger->log(Info, ss.str());
-			ss.str("");
-			ss.clear();
+			logger->log(Info, "Server: Recieved: " + bytesRecv + string(" bytes of \"") + buffer + "\" message.");
 
 			socket.setSocketLastRecv();
 			socket.setSocketSendState(HANDLE_REQ);
@@ -254,16 +235,12 @@ namespace web_server {
 
 		bytesSent = send(msgSocket, sokcetPtr->getOutGoingResponse(), (int)strlen(sokcetPtr->getOutGoingResponse()), 0);
 		if (SOCKET_ERROR == bytesSent) {
-			cerr << "Server: Error at send(): " << WSAGetLastError() << endl;
+			logger->log(Err, "Server: Error at send(): " + to_string(WSAGetLastError()));
 			return;
 		}
 
-		ss << "Server: Sent: " << bytesSent << "\\" << strlen(sokcetPtr->getOutGoingResponse()) << \
-			" bytes of \"" << sokcetPtr->getOutGoingResponse() << "\" message.";
-
-		logger->log(Info, ss.str());
-		ss.str("");
-		ss.clear();
+		logger->log(Info, "Server: Sent: " + bytesSent + string("\\") + to_string(strlen(sokcetPtr->getOutGoingResponse())) + \
+			" bytes of \"" + string(sokcetPtr->getOutGoingResponse()) + "\" message.");
 
 		(*sokcetPtr).setSocketSendState(IDLE);
 	}
@@ -273,12 +250,9 @@ namespace web_server {
 		int nameLen = sizeof(name);
 
 		if (getpeername(socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
-			cerr << "Server: Error at getpeername(): " << WSAGetLastError() << endl;
+			logger->log(Err, "Server: Error at getpeername(): " + to_string(WSAGetLastError()));
 		}
-
-		ss << "Server: Client " << inet_ntoa(name.sin_addr) << ":" << ntohs(name.sin_port) << " has disconnected.";
-		logger->log(Info, ss.str());
-		ss.str("");
-		ss.clear();
+		logger->log(Info, "Server: Client "+string(inet_ntoa(name.sin_addr)) + ":" +\
+			        to_string(ntohs(name.sin_port)) +" has disconnected.");
 	}
 }

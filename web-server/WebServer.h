@@ -11,7 +11,6 @@
 #include <queue>
 #include "Socket.h"
 #include "Logger.h"
-#include<sstream>
 #include "RequestParser.h"
 using namespace std;
 
@@ -30,7 +29,6 @@ namespace web_server {
 		list<Socket>sockets;
 		Logger* logger;
 		int maxSockets, serverPort;
-		std::stringstream ss;
 		list<list<Socket>::iterator> socketsToDelete;
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);

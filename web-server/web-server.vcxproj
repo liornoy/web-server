@@ -147,7 +147,6 @@
     <ClInclude Include="WebServer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="HTTPRequestHandler.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RequestParser.cpp" />
