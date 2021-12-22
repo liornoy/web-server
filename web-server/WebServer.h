@@ -12,6 +12,8 @@
 #include "Socket.h"
 #include "Logger.h"
 #include "RequestParser.h"
+#include "Response.h"
+#include "ResponseCreator.h"
 using namespace std;
 
 namespace web_server {
