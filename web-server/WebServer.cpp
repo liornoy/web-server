@@ -1,8 +1,8 @@
 #include "WebServer.h"
 
 namespace web_server {
-	WebServer::WebServer(int maxSockets, int serverPort) {
-		this->maxSockets = maxSockets;
+	WebServer::WebServer(int maxClients, int serverPort) {
+		this->maxClients = maxClients;
 		this->serverPort = serverPort;
 		this->logger = &Logger::instance();
 	}
@@ -25,7 +25,7 @@ namespace web_server {
 				WSACleanup();
 				return;
 			}
-			handleSockets(numOfFD, &waitRecv, &waitSend);
+			handleClients(numOfFD, &waitRecv, &waitSend);
 		}
 
 		logger->log(Info, "Server: Server Shutting Down.");
@@ -71,15 +71,15 @@ namespace web_server {
 
 		logger->log(Info, "Server is ready and running on address " + string(inet_ntoa(serverService.sin_addr)) + ":" + to_string(serverPort));
 
-		addSocket(socketID, LISTEN);
+		addNewClient(socketID, RecvMod::LISTEN);
 
 		return socketID;
 	}
 
-	bool WebServer::addSocket(SOCKET id, int recvStatus) {
-		if (sockets.size() < maxSockets) {
-			Socket newSocket(id, recvStatus);
-			sockets.push_back(newSocket);
+	bool WebServer::addNewClient(SOCKET id, int recvStatus) {
+		if (clients.size() < maxClients) {
+			Socket* newSocket = new Socket(id);
+			clients.push_back(Client(newSocket, (RecvMod)recvStatus));
 			return true;
 		}
 		return false;
@@ -89,32 +89,26 @@ namespace web_server {
 		FD_ZERO(waitRecv);
 		FD_ZERO(waitSend);
 
-		list<Socket>::iterator it;
-
-		for (it = sockets.begin(); it != sockets.end(); ++it) {
-			SocketState currSocketState = (*it).getSocketState();
-			if (currSocketState.recv == LISTEN || currSocketState.recv == RECEIVE)
-				FD_SET((*it).getSocketID(), waitRecv);
-			if (currSocketState.send == SEND_RESPONSE)
-				FD_SET((*it).getSocketID(), waitSend);
+		for (auto iter = clients.begin(); iter != clients.end(); ++iter) {
+			if (iter->getRecvMod() == LISTEN || iter->getRecvMod() == RECEIVE)
+				FD_SET(iter->getSocket()->getSocketID(), waitRecv);
+			if (iter->hasReadyResponses())
+				FD_SET(iter->getSocket()->getSocketID(), waitSend);
 		}
 
 		return select(0, waitRecv, waitSend, NULL, &SELECT_TIME_OUT_VAL);
 	}
 
-	void WebServer::handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend) {
-		list<Socket>::iterator socketIterator;
+	void WebServer::handleClients(int numOfFD, fd_set* waitRecv, fd_set* waitSend) {
+		
 
-		time_t now;
-		time(&now);
-
-		for (socketIterator = sockets.begin(); socketIterator != sockets.end(); ++socketIterator) {
+		for (auto iter = clients.begin(); iter != clients.end(); ++iter) {
 			if (numOfFD > 0) {
-				handleWaitRecv(socketIterator, waitRecv, numOfFD);
-				handleWaitSend(socketIterator, waitSend, numOfFD);
+				handleWaitRecv(iter, waitRecv, numOfFD);
+				handleWaitSend(iter, waitSend, numOfFD);
 			}
-			handleInComingRequests(socketIterator);
-			handleTimeOut(socketIterator, now);
+			handleInComingRequests(iter);
+			handleTimeOut(iter, now);
 		}
 
 		deleteSockets();
@@ -148,32 +142,41 @@ namespace web_server {
 		}
 	}
 
-	void WebServer::handleWaitSend(list<Socket>::iterator& socketIterator, fd_set* waitSend, int& numOfFD) {
-		if (FD_ISSET((*socketIterator).getSocketID(), waitSend)) {
+	void WebServer::handleWaitSend(list<Client>::iterator& client, fd_set* waitSend, int& numOfFD) {
+		if (FD_ISSET(client->getSocketID(), waitSend)) {
 			numOfFD--;
-			sendMessage(&(*socketIterator));
+			bool err = client->sendResponses();
+			if (err){
+				logger->log(Err, "Server: Error at send(): " + to_string(WSAGetLastError()));
+			}
+			else {
+				logger->log(Info, "Server: Sent message.");
+			}
 		}
 	}
 
 	void WebServer::handleTimeOut(list<Socket>::iterator& socketIterator, time_t now) {
+		time_t now;
+		time(&now);
+
 		time_t timePassed = now - (*socketIterator).getSocketState().lastRecvTime;
 
 		if (timePassed >= TIME_OUT && (*socketIterator).getSocketState().recv == RECEIVE) {
 			logger->log(Info, "Server: Client Timed Out, disconnecting...");
-			socketsToDelete.push_back(socketIterator);
+			clientsToDelete.push_back(socketIterator);
 		}
 	}
 
 	void WebServer::deleteSockets() {
-		auto it = socketsToDelete.begin();
-		while (it != socketsToDelete.end()) {
-			printDisconnectSocket((*(*it)).getSocketID());
-			closesocket((*(*it)).getSocketID());
-			sockets.erase((*it));
+		auto it = clientsToDelete.begin();
+		while (it != clientsToDelete.end()) {
+			printDisconnectSocket((*it)->getSocket()->getSocketID());
+			closesocket((*it)->getSocket()->getSocketID());
+			clients.erase((*it));
 			it++;
 		}
 
-		socketsToDelete.clear();
+		clientsToDelete.clear();
 	}
 
 	void WebServer::acceptConnection(Socket& socket) {
@@ -219,30 +222,19 @@ namespace web_server {
 		else {
 			buffer[bytesRecv] = '\0'; //add the null-terminating to make it a string
 			logger->log(Info, "Server: Recieved: " + bytesRecv + string(" bytes of \"") + buffer + "\" message.");
-
 			socket.setSocketLastRecv();
 			socket.setSocketSendState(HANDLE_REQ);
-			socket.setInComingRequest(buffer);
-
+			pendingRequests.push(RequestParser::ParseRequest(buffer));
 			return true;
 		}
 	}
 
-	void WebServer::sendMessage(Socket* sokcetPtr) {
+	void WebServer::sendMessage(SOCKET sokcetPtr) {
 		int bytesSent = 0;
 
 		SOCKET msgSocket = (*sokcetPtr).getSocketID();
 
-		bytesSent = send(msgSocket, sokcetPtr->getOutGoingResponse(), (int)strlen(sokcetPtr->getOutGoingResponse()), 0);
-		if (SOCKET_ERROR == bytesSent) {
-			logger->log(Err, "Server: Error at send(): " + to_string(WSAGetLastError()));
-			return;
-		}
-
-		logger->log(Info, "Server: Sent: " + bytesSent + string("\\") + to_string(strlen(sokcetPtr->getOutGoingResponse())) + \
-			" bytes of \"" + string(sokcetPtr->getOutGoingResponse()) + "\" message.");
-
-		(*sokcetPtr).setSocketSendState(IDLE);
+	
 	}
 
 	void WebServer::printDisconnectSocket(const SOCKET& socket) {

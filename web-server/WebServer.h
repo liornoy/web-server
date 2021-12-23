@@ -9,11 +9,11 @@
 #include <list>
 #include <map>
 #include <queue>
-#include "Socket.h"
 #include "Logger.h"
 #include "RequestParser.h"
 #include "Response.h"
-#include "ResponseCreator.h"
+#include "Client.h"
+#include "RequestHandler.h"
 using namespace std;
 
 namespace web_server {
@@ -26,15 +26,16 @@ namespace web_server {
 		void operator=(WebServer const&) = delete;
 
 	private:
-		const int TIME_OUT = 5;
+		const int TIME_OUT = 120;
+		const string SERVER_FILES_PATH = "C:/temp";
 		const timeval SELECT_TIME_OUT_VAL{ TIME_OUT,0 };
-		list<Socket>sockets;
+		list<Client>clients;
 		Logger* logger;
-		int maxSockets, serverPort;
-		list<list<Socket>::iterator> socketsToDelete;
+		int maxClients, serverPort;
+		list<list<Client>::iterator> clientsToDelete;
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
-		bool addSocket(SOCKET id, int recvStatus);
+		bool addNewClient(SOCKET id, int recvStatus);
 		void acceptConnection(Socket& socket);
 		bool receiveMessage(Socket& socket);
 		void sendMessage(Socket* socket);
@@ -44,7 +45,7 @@ namespace web_server {
 		void handleWaitSend(list<Socket>::iterator& socketIterator, fd_set* waitSend, int& numOfFD);
 		void handleTimeOut(list<Socket>::iterator& socketIterator, time_t now);
 		void handleInComingRequests(list<Socket>::iterator& socketIterator);
-		void handleSockets(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
+		void handleClients(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
 		void deleteSockets();
 	};
 }

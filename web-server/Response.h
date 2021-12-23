@@ -1,4 +1,5 @@
 #pragma once
+#include <string.h>
 namespace web_server {
 	class Response
 	{
@@ -8,5 +9,6 @@ namespace web_server {
 		HTTPVersion ProtocolVersion;
 
 	public:
+		const char* toString() { return ""; }
 	};
 }
