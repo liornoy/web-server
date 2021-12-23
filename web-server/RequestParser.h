@@ -5,6 +5,8 @@ namespace web_server {
 	{
 	public:
 		static Request ParseRequest(string inComingMsg);
+		
+	private:
 		static RequestLine extractRequestLine(string inComingMsg, int& readIndex);
 		static map<string, string> extractRequestHeaderFields(string inComingMsg, int& readIndex);
 		static string extractRequestBody(string inComingMsg, int& readIndex);
