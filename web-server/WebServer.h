@@ -36,16 +36,13 @@ namespace web_server {
 
 		int selectSockets(fd_set* waitRecv, fd_set* waitSend);
 		bool addNewClient(SOCKET id, int recvStatus);
-		void acceptConnection(Socket& socket);
-		bool receiveMessage(Socket& socket);
-		void sendMessage(Socket* socket);
+		void acceptConnection(list<Client>::iterator& socket);
 		SOCKET initListenSocket();
 		void printDisconnectSocket(const SOCKET& socket);
-		void handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set* waitRecv, int& numOfFD);
-		void handleWaitSend(list<Socket>::iterator& socketIterator, fd_set* waitSend, int& numOfFD);
-		void handleTimeOut(list<Socket>::iterator& socketIterator, time_t now);
-		void handleInComingRequests(list<Socket>::iterator& socketIterator);
+		void handleWaitRecv(list<Client>::iterator& client, fd_set* waitRecv, int& numOfFD);
+		void handleWaitSend(list<Client>::iterator& client, fd_set* waitSend, int& numOfFD);
+		void handleTimeOut(list <Client>::iterator& client);
 		void handleClients(int numOfFD, fd_set* waitRecv, fd_set* waitSend);
-		void deleteSockets();
+		void deleteClients();
 	};
 }

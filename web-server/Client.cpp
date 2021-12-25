@@ -12,6 +12,29 @@ namespace web_server {
 		return lastRecvTime;
 	}
 
+	// recvMsg reads a message from the client's socket and push it to the 
+	// pending requests. returns error if connection needs to disconnect.
+	Error Client::recvMsg() {
+		char buffer[MAX_MSG_SIZE];
+
+		int bytesRecv = recv(socketID, buffer, sizeof(buffer), 0);
+
+		if (SOCKET_ERROR == bytesRecv) {
+			return Error("Server: Error at recv()");
+		}
+
+		if (bytesRecv == 0) {
+			return Error("Disconnected");
+		}
+
+		else {
+			time(&lastRecvTime);
+			buffer[bytesRecv] = '\0'; //add the null-terminating to make it a string
+			pendingRequests.push(RequestParser::ParseRequest(buffer));
+			return nullptr;
+		}
+	}
+
 	// sendResponses sends all the responses that are ready to be sent back.
 	// returns true if an error accured.
 	bool Client::sendResponses(){

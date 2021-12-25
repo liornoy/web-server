@@ -77,9 +77,9 @@ namespace web_server {
 	}
 
 	bool WebServer::addNewClient(SOCKET id, int recvStatus) {
+		cout << "ples add: " << id << endl;
 		if (clients.size() < maxClients) {
-			Socket* newSocket = new Socket(id);
-			clients.push_back(Client(newSocket, (RecvMod)recvStatus));
+			clients.push_back(Client(id, (RecvMod)recvStatus));
 			return true;
 		}
 		return false;
@@ -89,53 +89,45 @@ namespace web_server {
 		FD_ZERO(waitRecv);
 		FD_ZERO(waitSend);
 
-		for (auto iter = clients.begin(); iter != clients.end(); ++iter) {
-			if (iter->getRecvMod() == LISTEN || iter->getRecvMod() == RECEIVE)
-				FD_SET(iter->getSocket()->getSocketID(), waitRecv);
-			if (iter->hasReadyResponses())
-				FD_SET(iter->getSocket()->getSocketID(), waitSend);
+		for (auto client = clients.begin(); client != clients.end(); ++client) {
+			if (client->getRecvMod() == LISTEN || client->getRecvMod() == RECEIVE) {
+				FD_SET(client->getSocketID(), waitRecv);
+				cout << "i am " << client->getSocketID() << endl;
+			}
+			if (client->hasReadyResponses()) {
+				cout << "bugdafgadas" << endl;
+				FD_SET(client->getSocketID(), waitSend);
+			}
 		}
 
 		return select(0, waitRecv, waitSend, NULL, &SELECT_TIME_OUT_VAL);
 	}
 
 	void WebServer::handleClients(int numOfFD, fd_set* waitRecv, fd_set* waitSend) {
-		
-
-		for (auto iter = clients.begin(); iter != clients.end(); ++iter) {
+		for (auto client = clients.begin(); client != clients.end(); ++client) {
 			if (numOfFD > 0) {
-				handleWaitRecv(iter, waitRecv, numOfFD);
-				handleWaitSend(iter, waitSend, numOfFD);
+				handleWaitRecv(client, waitRecv, numOfFD);
+				handleWaitSend(client, waitSend, numOfFD);
 			}
-			handleInComingRequests(iter);
-			handleTimeOut(iter, now);
+			handleTimeOut(client);
 		}
 
-		deleteSockets();
+		deleteClients();
 	}
 
-	void WebServer::handleInComingRequests(list<Socket>::iterator& socketIterator) {
-		if ((*socketIterator).getSocketState().send != HANDLE_REQ) {
-			return;
-		}
-
-		Request req = RequestParser::ParseRequest((*socketIterator).getInComingResponse());
-		Response response = ResponseCreator::CreateResponse(req);
-		// socket.setSocketState.send(sendResponse)
-	}
-
-	void WebServer::handleWaitRecv(list<Socket>::iterator& socketIterator, fd_set* waitRecv, int& numOfFD) {
-		if (FD_ISSET((*socketIterator).getSocketID(), waitRecv)) {
+	void WebServer::handleWaitRecv(list<Client>::iterator& client, fd_set* waitRecv, int& numOfFD) {
+		if (FD_ISSET((*client).getSocketID(), waitRecv)) {
 			numOfFD--;
-			switch ((*socketIterator).getSocketState().recv) {
+			switch ((*client).getRecvMod()) {
 			case LISTEN:
-				acceptConnection(*socketIterator);
+				acceptConnection(client);
 				break;
 
 			case RECEIVE:
 				// false if connection needs to shut down
-				if (false == receiveMessage(*socketIterator)) {
-					socketsToDelete.push_back(socketIterator);
+				Error err = client->recvMsg();
+				if (err != nullptr) {
+					clientsToDelete.push_back(client);
 				}
 				break;
 			}
@@ -155,23 +147,22 @@ namespace web_server {
 		}
 	}
 
-	void WebServer::handleTimeOut(list<Socket>::iterator& socketIterator, time_t now) {
+	void WebServer::handleTimeOut(list<Client>::iterator& client) {
 		time_t now;
 		time(&now);
 
-		time_t timePassed = now - (*socketIterator).getSocketState().lastRecvTime;
-
-		if (timePassed >= TIME_OUT && (*socketIterator).getSocketState().recv == RECEIVE) {
+		time_t timePassed = now - client->getLastRecvTime();
+		if (timePassed >= TIME_OUT && client->getRecvMod()== RECEIVE) {
 			logger->log(Info, "Server: Client Timed Out, disconnecting...");
-			clientsToDelete.push_back(socketIterator);
+			clientsToDelete.push_back(client);
 		}
 	}
 
-	void WebServer::deleteSockets() {
+	void WebServer::deleteClients() {
 		auto it = clientsToDelete.begin();
 		while (it != clientsToDelete.end()) {
-			printDisconnectSocket((*it)->getSocket()->getSocketID());
-			closesocket((*it)->getSocket()->getSocketID());
+			printDisconnectSocket((*it)->getSocketID());
+			closesocket((*it)->getSocketID());
 			clients.erase((*it));
 			it++;
 		}
@@ -179,11 +170,11 @@ namespace web_server {
 		clientsToDelete.clear();
 	}
 
-	void WebServer::acceptConnection(Socket& socket) {
+	void WebServer::acceptConnection(list<Client>::iterator& client) {
 		struct sockaddr_in from;
 		int fromLen = sizeof(from);
 
-		SOCKET msgSocket = accept(socket.getSocketID(), (struct sockaddr*)&from, &fromLen);
+		SOCKET msgSocket = accept(client->getSocketID(), (struct sockaddr*)&from, &fromLen);
 		if (INVALID_SOCKET == msgSocket) {
 			logger->log(Err, "Server: Error at accept(): " + to_string(WSAGetLastError()));
 			return;
@@ -198,43 +189,10 @@ namespace web_server {
 			logger->log(Err, "Server: Error at ioctlsocket(): " + to_string(WSAGetLastError()));
 		}
 
-		if (addSocket(msgSocket, RECEIVE) == false) {
+		if (addNewClient(msgSocket, RECEIVE) == false) {
 			logger->log(Info, "Too many connections, dropped!");
-			closesocket(socket.getSocketID());
+			closesocket(msgSocket);
 		}
-	}
-
-	bool WebServer::receiveMessage(Socket& socket) {
-		char buffer[MAX_MSG_SIZE];
-		SOCKET msgSocket = socket.getSocketID();
-
-		int bytesRecv = recv(msgSocket, buffer, sizeof(buffer), 0);
-
-		if (SOCKET_ERROR == bytesRecv) {
-			logger->log(Err, "Server: Error at recv(): " + to_string(WSAGetLastError()));
-			return false;
-		}
-
-		if (bytesRecv == 0) {
-			return false;
-		}
-
-		else {
-			buffer[bytesRecv] = '\0'; //add the null-terminating to make it a string
-			logger->log(Info, "Server: Recieved: " + bytesRecv + string(" bytes of \"") + buffer + "\" message.");
-			socket.setSocketLastRecv();
-			socket.setSocketSendState(HANDLE_REQ);
-			pendingRequests.push(RequestParser::ParseRequest(buffer));
-			return true;
-		}
-	}
-
-	void WebServer::sendMessage(SOCKET sokcetPtr) {
-		int bytesSent = 0;
-
-		SOCKET msgSocket = (*sokcetPtr).getSocketID();
-
-	
 	}
 
 	void WebServer::printDisconnectSocket(const SOCKET& socket) {
@@ -244,6 +202,7 @@ namespace web_server {
 		if (getpeername(socket, (struct sockaddr*)&name, &nameLen) == SOCKET_ERROR) {
 			logger->log(Err, "Server: Error at getpeername(): " + to_string(WSAGetLastError()));
 		}
+
 		logger->log(Info, "Server: Client "+string(inet_ntoa(name.sin_addr)) + ":" +\
 			        to_string(ntohs(name.sin_port)) +" has disconnected.");
 	}

@@ -5,7 +5,7 @@
 
 using namespace std;
 namespace web_server {
-	enum MethodType { GET, OPTION, HEAD, POST, PUT, DELETE, TRACE };
+	enum MethodType { GET, OPTION, HEAD, POST, PUT, _DELETE, TRACE };
 	enum HTTPVersion { HTTPDOT0, HTTPDOT1 };
 	const string HTTPVerDot1 = "HTTP / 1.1";
 	const string HTTPVetDot0 = "HTTP / 1.0";

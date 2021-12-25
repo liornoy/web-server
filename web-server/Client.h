@@ -2,9 +2,14 @@
 #include "Request.h"
 #include <winsock2.h>
 #include "Response.h"
+#include "Error.h"
+#include "RequestParser.h"
 #include <time.h>
 #include <queue>
 namespace web_server {
+
+#define MAX_MSG_SIZE 2048
+
 	enum RecvMod { LISTEN, RECEIVE };
 	enum SendMod { IDLE, SEND };
 	class Client
@@ -17,8 +22,6 @@ namespace web_server {
 		queue<Response>readyResponses;
 
 	public:
-		Client() = delete;
-		Client(const Client&) = delete;
 		Client(SOCKET socketID, enum RecvMod recvMod);
 		~Client();
 
@@ -26,6 +29,8 @@ namespace web_server {
 		SOCKET getSocketID();
 		bool hasPendingRequests();
 		bool hasReadyResponses();
+		Error recvMsg();
+
 		enum RecvMod getRecvMod();
 		queue<Request> getPendingRequests();
 		queue<Response> getReadyResponses();
