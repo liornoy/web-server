@@ -449,6 +449,7 @@ return NULL;
 		}
 
 		if (bytesRecv == 0) {
+			cout << "bybyb" << endl;
 			return false;
 		}
 

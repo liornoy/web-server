@@ -139,10 +139,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="HTTPRequestHandler.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Request.h" />
     <ClInclude Include="RequestParser.h" />
+    <ClInclude Include="Response.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="WebServer.h" />
   </ItemGroup>
@@ -150,6 +150,7 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="RequestParser.cpp" />
+    <ClCompile Include="Response.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="WebServer.cpp" />
   </ItemGroup>

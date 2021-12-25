@@ -15,6 +15,11 @@ namespace web_server {
 		time(&socketState.lastRecvTime);
 	}
 
+	void Socket::setResponse(const char* response) {
+		outgoingResponse[0] = '\0';
+		strcpy_s(outgoingResponse, response);
+	}
+
 	void Socket::setSocketSendState(int newState) {
 		socketState.send = newState;
 	}

@@ -36,7 +36,7 @@ namespace web_server {
 		bool operator==(const Socket& other) const;
 		char* getOutGoingResponse();
 		char* getInComingResponse();
-
+		void setResponse(const char* response);
 		void setInComingRequest(char* msg);
 	};
 }
